@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Destino Gracia Resorts</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom animations for a smoother experience */
+        @keyframes bounce {
+            0%, 100% {
+                transform: translateY(-25%);
+                animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+            }
+            50% {
+                transform: translateY(0);
+                animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+            }
+        }
+        .animate-bounce {
+            animation: bounce 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: .5;
+            }
+        }
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .animate-fade-in {
+            animation: fadeIn 1s ease-out forwards;
+        }
+
+        @keyframes scaleIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .animate-scale-in {
+            animation: scaleIn 0.5s ease-out forwards;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        .animate-shake {
+            animation: shake 0.5s infinite;
+        }
+
+        /* Custom style for dotted line */
+        .dotted-border-r {
+            border-right: 2px dashed rgba(0, 0, 0, 0.3);
+        }
+        .dotted-border-l {
+            border-left: 2px dashed rgba(0, 0, 0, 0.3);
+        }
+
+        /* Seatbelt specific animations */
+        @keyframes buckle-tongue-close {
+            from { transform: translateX(-30px); } /* Start left, further out */
+            to { transform: translateX(0); } /* Move to center */
+        }
+
+        @keyframes buckle-receiver-close {
+            from { transform: translateX(30px); } /* Start right, further out */
+            to { transform: translateX(0); } /* Move to center */
+        }
+
+        @keyframes buckled-glow {
+            0% { filter: drop-shadow(0 0 0px yellow); }
+            50% { filter: drop-shadow(0 0 8px yellow); } /* Increased glow */
+            100% { filter: drop-shadow(0 0 0px yellow); }
+        }
+
+        .buckle-tongue-closing {
+            animation: buckle-tongue-close 0.5s ease-out forwards;
+        }
+        .buckle-receiver-closing {
+            animation: buckle-receiver-close 0.5s ease-out forwards;
+        }
+        .buckled-flash {
+            animation: buckled-glow 0.8s ease-out; /* Quick flash */
+        }
+        
+        /* NEW Takeoff Animation */
+        @keyframes sky-gradient {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 0% 0%; }
+        }
+
+        @keyframes cloud-flow {
+            0% { transform: translateY(100%); opacity: 0; }
+            10%, 80% { opacity: 1; }
+            100% { transform: translateY(-150%); opacity: 0; }
+        }
+
+        .sky-background {
+            background: linear-gradient(180deg, #87CEEB, #4682B4, #00008B);
+            background-size: 100% 300%;
+            animation: sky-gradient 5s ease-in forwards;
+        }
+        
+        .cloud {
+            position: absolute;
+            width: 150px;
+            height: auto;
+            opacity: 0;
+            animation: cloud-flow linear infinite;
+        }
+        
+        /* Utility to hide scrollbar */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-100 flex items-center justify-center p-4 font-sans">
+    <div id="app-container" class="bg-white shadow-2xl rounded-xl p-8 max-w-3xl w-full text-center border-b-4 border-indigo-500 max-h-[90vh] overflow-y-auto no-scrollbar">
+        <p class="text-xl font-bold text-indigo-700">Cargando la experiencia de fe...</p>
+        <p class="text-gray-600 mt-2">Por favor espera mientras preparamos tu viaje.</p>
+    </div>
+
+    <script type="module">
+        console.log("Script de la aplicación HTML cargado."); // Confirmación de carga del script
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, updateDoc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global state variables
+        let currentStage = 'coverPage';
+        let participantName = '';
+        let selectedSeat = null;
+        let seatsAvailability = {};
+        let currentUserId = null;
+        let isAuthReady = false;
+        let showCheckinFormHtml = false;
+        let nameSubmittedHtml = false;
+        let chosenFaithDestination = null;
+
+        let app = null;
+        let db = null;
+        let auth = null;
+        const appId = 'un-viaje-de-fe'; // Hardcoded ID for the experience
+
+        // --- Firebase Initialization and Listeners ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCGIcqiyioJ8chhDxgjlwOuoW0lpliO1jY",
+            authDomain: "gesapp-1abf9.firebaseapp.com",
+            databaseURL: "https://gesapp-1abf9.firebaseio.com",
+            projectId: "gesapp-1abf9",
+            storageBucket: "gesapp-1abf9.appspot.com",
+            messagingSenderId: "618034980267",
+            appId: "1:618034980267:web:01f11b153b6decb94f9eee",
+            measurementId: "G-ME2KGNF1VY"
+        };
+        
+        const setupFirebase = async () => {
+            if (Object.keys(firebaseConfig).length > 5 && firebaseConfig.apiKey) {
+                try {
+                    app = initializeApp(firebaseConfig);
+                    db = getFirestore(app);
+                    auth = getAuth(app);
+                    console.log("Firebase initialized successfully.");
+                    authenticateFirebaseUser();
+                } catch (initError) {
+                    showFirebaseError(initError);
+                }
+            } else {
+                showFirebaseError({ code: 'config-not-found' });
+            }
+        };
+
+        const authenticateFirebaseUser = async () => {
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUserId = user.uid;
+                    isAuthReady = true;
+                    console.log("User authenticated:", user.uid);
+                    setupSeatsListener();
+                } else {
+                    signInAnonymously(auth).catch((error) => {
+                        showFirebaseError(error);
+                    });
+                }
+            });
+        };
+
+        const setupSeatsListener = () => {
+            if (db) {
+                const seatsDocRef = doc(db, `viajes/${appId}/seats`, 'availability');
+                onSnapshot(seatsDocRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        seatsAvailability = docSnap.data();
+                        if (currentStage === 'coverPage' && isAuthReady) {
+                            renderCurrentStage();
+                        } else if (currentStage === 'boardingPass') {
+                            renderStageBoardingPass();
+                        }
+                    } else {
+                        console.log("No seat availability data found. Initializing...");
+                        const initialSeats = [
+                            'A1', 'A2', 'A3', 'A4', 'B1', 'B2', 'B3', 'B4',
+                            'C1', 'C2', 'C3', 'C4', 'D1', 'D2', 'D3', 'D4',
+                        ].reduce((acc, seatId) => ({ ...acc, [seatId]: null }), {});
+                        setDoc(seatsDocRef, initialSeats, { merge: true }).catch(e => showFirebaseError(e));
+                    }
+                }, (error) => {
+                    showFirebaseError(error);
+                });
+            }
+        };
+
+        // --- Stage Rendering Functions ---
+        const appContainer = document.getElementById('app-container');
+
+        const clearContent = () => {
+            appContainer.innerHTML = '';
+        };
+
+        const renderCurrentStage = () => {
+            if (!isAuthReady && currentStage !== 'coverPage') {
+                console.log("Firebase not ready, deferring renderCurrentStage.");
+                return;
+            }
+            console.log("Rendering stage:", currentStage);
+
+            clearContent();
+            switch (currentStage) {
+                case 'coverPage':
+                    renderCoverPage();
+                    break;
+                case 'chooseDestination':
+                    renderChooseDestinationStage();
+                    break;
+                case 'prepare':
+                    renderStagePrepare();
+                    break;
+                case 'boardingPass':
+                    renderStageBoardingPass();
+                    break;
+                case 'boardingPassGenerated':
+                    renderStageBoardingPassGenerated();
+                    break;
+                case 'luggageIntro':
+                    renderLuggageIntroAnimation();
+                    break;
+                case 'luggage':
+                    renderStageLuggage();
+                    break;
+                case 'luggageDropOffIntro':
+                    renderLuggageDropOffAnimation();
+                    break;
+                case 'lightenedLoadMessage':
+                    renderLightenedLoadMessage();
+                    break;
+                case 'airport':
+                    renderStageAirport();
+                    break;
+                case 'welcomeAboardIntro':
+                    renderWelcomeAboardAnimation();
+                    break;
+                case 'boarding':
+                    renderStageBoarding();
+                    break;
+                case 'fastenSeatbeltIntro':
+                    renderFastenSeatbeltAnimation();
+                    break;
+                case 'story':
+                    renderStageStory();
+                    break;
+                case 'takeoffAnimation':
+                    renderTakeoffAnimation();
+                    break;
+                case 'travel':
+                    renderStageTravel();
+                    break;
+                case 'turbulenceIntro':
+                    renderTurbulenceAnimation();
+                    break;
+                case 'destination':
+                    renderStageDestination();
+                    break;
+                case 'destinationArrivalIntro':
+                    renderDestinationArrivalAnimation();
+                    break;
+                case 'finalThanks': // Restored this stage
+                    renderFinalThanks();
+                    break;
+                case 'finalScreen':
+                    renderFinalScreen();
+                    break;
+                default:
+                    console.error("Unknown stage:", currentStage);
+            }
+        };
+
+        const showFirebaseError = (error) => {
+            console.error("Firebase Error:", error);
+            let title = "Error de Conexión";
+            let message = `<p>No se pudo conectar con los servicios de la aplicación. Por favor, revisa tu conexión a internet.</p>`;
+
+            if (error.code === 'config-not-found') {
+                 title = "Error Crítico: Falta la Configuración de Firebase";
+                 message = `<p>Esta aplicación no puede conectar a su base de datos porque las claves del proyecto no han sido añadidas al código.</p>
+                        <p class="mt-2"><b>Solución:</b></p>
+                        <ol class="list-decimal list-inside text-sm">
+                            <li>Abre este archivo HTML en un editor de texto.</li>
+                            <li>Busca la variable <code class="bg-red-200 p-1 rounded">firebaseConfig</code>.</li>
+                            <li>Pega las claves de tu proyecto de Firebase dentro del objeto. Puedes obtenerlas desde la configuración de tu proyecto en la consola de Firebase.</li>
+                        </ol>`;
+            } else if (error.code === 'auth/admin-restricted-operation' || error.code === 'auth/operation-not-allowed') {
+                title = "Error de Autenticación";
+                message = `
+                    <p>El inicio de sesión anónimo no está habilitado para este proyecto de Firebase.</p>
+                    <p class="mt-2"><b>Solución:</b></p>
+                    <ol class="list-decimal list-inside text-sm">
+                        <li>Ve a tu <a href="https://console.firebase.google.com/" target="_blank" class="underline">Consola de Firebase</a>.</li>
+                        <li>Selecciona tu proyecto: <b>gesapp-1abf9</b>.</li>
+                        <li>En el menú de la izquierda, ve a <b>Authentication</b>.</li>
+                        <li>Haz clic en la pestaña <b>Sign-in method</b> (Método de inicio de sesión).</li>
+                        <li>En la lista de proveedores, busca <b>Anónimo</b> y haz clic en el lápiz para editar.</li>
+                        <li>Habilita el proveedor y guarda los cambios.</li>
+                        <li>Recarga esta página.</li>
+                    </ol>
+                `;
+            } else if (error.message.includes("Failed to get document") || error.code === 'permission-denied' || error.message.includes("offline")) {
+                 title = "Error de Base de Datos";
+                 message = `
+                     <p>No se pudo leer la información de los asientos. Esto puede ocurrir por dos razones:</p>
+                    <p class="mt-2"><b>1. La base de datos no ha sido creada en tu proyecto Firebase:</b></p>
+                    <ol class="list-decimal list-inside text-sm">
+                        <li>Ve a tu <a href="https://console.firebase.google.com/" target="_blank" class="underline">Consola de Firebase</a>.</li>
+                        <li>En el menú de la izquierda, ve a <b>Firestore Database</b>.</li>
+                        <li>Haz clic en <b>Crear base de datos</b> y créala en modo de <b>producción</b>.</li>
+                    </ol>
+                    <p class="mt-2"><b>2. Las reglas de seguridad están bloqueando el acceso:</b></p>
+                    <ol class="list-decimal list-inside text-sm">
+                        <li>En la sección <b>Firestore Database</b>, ve a la pestaña <b>Reglas</b>.</li>
+                        <li>Reemplaza todo el contenido con las siguientes reglas y haz clic en <b>Publicar</b>:</li>
+                    </ol>
+                    <pre class="bg-gray-200 text-black p-2 rounded mt-1 text-xs whitespace-pre-wrap">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}</pre>
+                `;
+            }
+
+            appContainer.innerHTML = `
+                <div class="text-left p-4 bg-red-100 border-l-4 border-red-500 text-red-700">
+                    <h3 class="font-bold">${title}</h3>
+                    ${message}
+                </div>
+            `;
+        };
+
+        // --- Individual Stage Renderers ---
+
+        const renderChooseDestinationStage = () => {
+            const spiritualDestinations = [
+                { name: 'Fe', description: 'Confianza plena en Dios a pesar de las circunstancias.', tariff: 'Entrega', gateConcept: 'Confianza' },
+                { name: 'Arrepentimiento', description: 'Reconocimiento de errores y cambio de dirección hacia Dios.', tariff: 'Conciencia', gateConcept: 'Perdón' },
+                { name: 'Esperanza', description: 'La certeza de las promesas de Dios para el futuro.', tariff: 'Paciencia', gateConcept: 'Promesa' },
+                { name: 'Amor', description: 'El amor incondicional de Dios que nos impulsa a amar a otros.', tariff: 'Compasión', gateConcept: 'Comunión' },
+                { name: 'Obediencia', description: 'La voluntad de seguir los mandatos de Dios.', tariff: 'Voluntad', gateConcept: 'Rectitud' },
+                { name: 'Paz', description: 'La tranquilidad que solo Dios puede dar en medio de cualquier situación.', tariff: 'Serenidad', gateConcept: 'Calma' },
+            ];
+            let selectedSpiritualDestination = null;
+
+            const updateDestinationSelectionUI = () => {
+                const destinationsContainer = document.getElementById('destinations-container');
+                if (!destinationsContainer) return;
+
+                destinationsContainer.innerHTML = spiritualDestinations.map(dest => `
+                    <button id="dest-${dest.name}" class="p-4 rounded-lg shadow-md transition-all duration-200 text-left cursor-pointer
+                        ${selectedSpiritualDestination && selectedSpiritualDestination.name === dest.name ? 'bg-indigo-500 text-white scale-105' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}">
+                        <h3 class="font-bold text-lg mb-1">${dest.name}</h3>
+                        <p class="text-sm ${selectedSpiritualDestination && selectedSpiritualDestination.name === dest.name ? 'text-indigo-100' : 'text-gray-600'}">${dest.description}</p>
+                        <p class="text-xs mt-2 opacity-80">Tarifa: <span class="font-semibold">${dest.tariff}</span></p>
+                    </button>
+                `).join('');
+
+                spiritualDestinations.forEach(dest => {
+                    document.getElementById(`dest-${dest.name}`).addEventListener('click', () => {
+                        selectedSpiritualDestination = dest;
+                        updateDestinationSelectionUI();
+                        updateContinueButtonState();
+                    });
+                });
+            };
+
+            const updateContinueButtonState = () => {
+                const continueButton = document.getElementById('continue-destination-button');
+                if (continueButton) {
+                    if (selectedSpiritualDestination) {
+                        continueButton.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                        continueButton.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+                        continueButton.disabled = false;
+                    } else {
+                        continueButton.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                        continueButton.classList.add('bg-gray-400', 'cursor-not-allowed');
+                        continueButton.disabled = true;
+                    }
+                }
+            };
+
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center">
+                    <h1 class="text-4xl font-extrabold text-indigo-700 mb-6 drop-shadow-md">Elige tu Destino Espiritual</h1>
+                    <p class="text-gray-700 text-lg leading-relaxed mb-8 text-center max-w-xl">
+                        Cada viaje comienza con una intención. ¿Qué aspecto del amor de Dios deseas explorar y fortalecer en esta aventura?
+                    </p>
+                    <div id="destinations-container" class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-lg mb-8">
+                        </div>
+                    <button id="continue-destination-button" class="bg-gray-400 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-opacity-50 cursor-not-allowed" disabled>
+                        Continuar
+                    </button>
+                </div>
+            `;
+            updateDestinationSelectionUI();
+            updateContinueButtonState();
+
+            document.getElementById('continue-destination-button').addEventListener('click', () => {
+                if (selectedSpiritualDestination) {
+                    chosenFaithDestination = selectedSpiritualDestination;
+                    currentStage = 'prepare';
+                    renderCurrentStage();
+                } else {
+                    alert('Por favor, elige un destino espiritual para continuar.');
+                }
+            });
+        };
+
+        const renderCoverPage = () => {
+            const coverTitle = 'Destino Gracia Resorts';
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full animate-fade-in">
+                    <h1 class="text-5xl font-extrabold text-indigo-800 mb-6 drop-shadow-lg">
+                        ${coverTitle}
+                    </h1>
+                    <p class="text-xl text-gray-700 italic text-center mb-8 max-w-md">
+                        Unas vacaciones inmersivas para explorar y fortalecer tu camino espiritual.
+                    </p>
+                    <button id="start-journey-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50">
+                        Comenzar Viaje
+                    </button>
+                </div>
+            `;
+            document.getElementById('start-journey-button').addEventListener('click', () => {
+                currentStage = 'chooseDestination';
+                renderCurrentStage();
+            });
+        };
+
+        const renderStageStory = () => {
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center">
+                    <h1 class="text-4xl font-extrabold text-indigo-700 mb-6 drop-shadow-md">Un Mensaje del Capitán</h1>
+                    <div class="max-h-80 overflow-y-auto no-scrollbar text-left space-y-4">
+                        <p class="captain-message-text text-gray-700 text-lg leading-relaxed">Amados pasajeros, Yo soy el Camino, la Verdad y la Vida. Me alegra que hoy hayan decidido embarcarse en este vuelo de fe, esperanza y propósito eterno.</p>
+                        <p class="captain-message-text text-gray-700 text-lg leading-relaxed">Antes de despegar, dejen el temor en tierra firme. No se inquieten por el mañana, pues cada día trae su propio afán. Hoy, simplemente, confíen.</p>
+                        <p class="captain-message-text text-gray-700 text-lg leading-relaxed">Aseguren su corazón con el cinturón de la verdad, y si en algún momento sienten turbulencias, recuerden: Yo estoy con ustedes todos los días, hasta el fin del mundo.</p>
+                        <p class="captain-message-text text-gray-700 text-lg leading-relaxed">En caso de pérdida de rumbo, no teman: Mi paz sobrepasa todo entendimiento y Mis brazos estarán listos para sostenerlos.</p>
+                        <p class="captain-message-text text-gray-700 text-lg leading-relaxed">Este vuelo no es solo un destino, es parte del viaje que preparo para ustedes desde antes de la creación.</p>
+                        <p class="captain-message-text text-gray-700 text-lg leading-relaxed">Gracias por volar en nuestro vuelo SL173 de SpiritLift Airlines. Yo soy su Capitán, su Pastor y su Amigo.</p>
+                    </div>
+                    <p class="text-2xl font-bold text-indigo-600 mt-6 italic">¡Abróchate con fe, y prepárate para elevarte a nuevas alturas!</p>
+                    <button id="next-button" class="mt-8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50">
+                        Autorizar Despegue
+                    </button>
+                </div>
+            `;
+            
+            document.getElementById('next-button').addEventListener('click', () => {
+                currentStage = 'takeoffAnimation';
+                renderCurrentStage();
+            });
+        };
+        
+        const renderTakeoffAnimation = () => {
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full relative overflow-hidden sky-background rounded-xl">
+                    <div class="cloud" style="top: 10%; left: 10%; animation-duration: 5s;">
+                        <svg class="w-32 h-32 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M15.5 8a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0zM5.5 8a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0zm6.5 4a4.5 4.5 0 10-9 0h9z" clip-rule="evenodd"></path></svg>
+                    </div>
+                    <div class="cloud" style="top: 25%; left: 60%; animation-duration: 7s; animation-delay: 1s;">
+                        <svg class="w-48 h-48 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M15.5 8a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0zM5.5 8a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0zm6.5 4a4.5 4.5 0 10-9 0h9z" clip-rule="evenodd"></path></svg>
+                    </div>
+                    <div class="cloud" style="top: 60%; left: 20%; animation-duration: 6s; animation-delay: 2s;">
+                        <svg class="w-40 h-40 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M15.5 8a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0zM5.5 8a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0zm6.5 4a4.5 4.5 0 10-9 0h9z" clip-rule="evenodd"></path></svg>
+                    </div>
+                    <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-1/3 bg-gradient-to-t from-gray-700 to-transparent"></div>
+                     <div class="relative z-10 text-center">
+                        <h2 class="text-4xl font-extrabold text-white mb-4 drop-shadow-lg animate-pulse">
+                            ¡Estamos despegando!
+                        </h2>
+                        <p class="text-xl text-white/90 italic drop-shadow-md">
+                            El viaje hacia la ${chosenFaithDestination ? chosenFaithDestination.name : 'Fe'} ha comenzado.
+                        </p>
+                    </div>
+                </div>
+            `;
+
+            setTimeout(() => {
+                currentStage = 'travel';
+                renderCurrentStage();
+            }, 5000); // Wait for animation to finish before moving to the next stage
+        };
+
+        const renderStagePrepare = () => {
+            let checklistItems = [
+                { id: 1, text: 'Pasaporte: Un corazón abierto y dispuesto.', checked: false },
+                { id: 2, text: 'Visa de Fe: Confianza en el Piloto del viaje.', checked: false },
+                { id: 3, text: 'Boleto de Humildad: Reconocer que Él tiene el control.', checked: false },
+                { id: 4, text: 'Itinerario de Oración: Un plan para mantener la comunicación.', checked: false },
+                { id: 5, text: 'Reserva de Comunidad: Saber que no viajas solo.', checked: false },
+            ];
+
+            const updateChecklistUI = () => {
+                const checklistUl = appContainer.querySelector('#checklist-ul');
+                if (!checklistUl) return;
+
+                checklistUl.innerHTML = checklistItems.map(item => `
+                    <li id="checklist-item-${item.id}" class="flex items-center p-2 rounded-md cursor-pointer transition-colors duration-200 ${item.checked ? 'bg-green-100 text-green-800 shadow-sm' : 'bg-white hover:bg-gray-50'}">
+                        ${item.checked ? `
+                            <svg class="w-6 h-6 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        ` : `
+                            <svg class="w-6 h-6 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        `}
+                        <span class="font-semibold">${item.text}</span>
+                    </li>
+                `).join('');
+
+                checklistItems.forEach(item => {
+                    document.getElementById(`checklist-item-${item.id}`).addEventListener('click', () => {
+                        checklistItems = checklistItems.map(i => i.id === item.id ? { ...i, checked: !i.checked } : i);
+                        updateChecklistUI();
+                        updateNextButtonState();
+                    });
+                });
+            };
+
+            const updateNextButtonState = () => {
+                const nextButton = document.getElementById('next-button');
+                const allItemsChecked = checklistItems.every(item => item.checked);
+                if (nextButton) {
+                    if (allItemsChecked) {
+                        nextButton.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                        nextButton.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+                        nextButton.disabled = false;
+                    } else {
+                        nextButton.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                        nextButton.classList.add('bg-gray-400', 'cursor-not-allowed');
+                        nextButton.disabled = true;
+                    }
+                }
+            };
+
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center">
+                    <h2 class="text-3xl font-bold text-indigo-600 mb-5">Etapa 1: Documentación Espiritual</h2>
+                    <p class="text-gray-700 text-lg leading-relaxed mb-6 text-justify">
+                        Todo gran viaje exige tener la documentación en regla. Para estas vacaciones espirituales, nuestro pasaporte es un corazón dispuesto y nuestra visa es la fe. Revisemos que tengas todo en orden para embarcar.
+                    </p>
+                    <p class="text-gray-800 text-xl font-semibold mb-4 italic">
+                        "Y esta es la vida eterna: que te conozcan a ti, el único Dios verdadero, y a Jesucristo, a quien has enviado."
+                        <br /><span class="text-sm font-normal text-gray-600">(Juan 17:3)</span>
+                    </p>
+
+                    <div class="w-full max-w-md bg-white p-6 rounded-lg shadow-lg border border-gray-200 mb-8">
+                        <h3 class="text-2xl font-bold text-gray-800 mb-4">Checklist de Abordaje:</h3>
+                        <ul id="checklist-ul" class="list-none space-y-3 text-left text-gray-700 text-lg">
+                            </ul>
+                    </div>
+
+                    <p class="text-gray-800 text-xl font-semibold mb-8 italic">
+                        "Mi presencia irá contigo, y te daré descanso."
+                        <br /><span class="text-sm font-normal text-gray-600">(Éxodo 33:14)</span>
+                    </p>
+                    <button id="next-button" class="bg-gray-400 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-opacity-50 cursor-not-allowed" disabled>
+                        Siguiente: Reserva tu Asiento
+                    </button>
+                </div>
+            `;
+            updateChecklistUI();
+            updateNextButtonState();
+
+            document.getElementById('next-button').addEventListener('click', () => {
+                currentStage = 'boardingPass';
+                renderCurrentStage();
+            });
+        };
+
+        const renderStageBoardingPass = () => {
+            const seatsData = [
+                { id: 'A1', message: 'Tu asiento en la paz en medio de la tormenta.', verse: 'Filipenses 4:7' },
+                { id: 'A2', message: 'Tu asiento en la fortaleza divina.', verse: 'Isaías 41:10' },
+                { id: 'A3', message: 'Tu asiento en la provisión inagotable.', verse: 'Filipenses 4:19' },
+                { id: 'A4', message: 'Tu asiento en la guía del Espíritu Santo.', verse: 'Juan 16:13' },
+                { id: 'B1', message: 'Tu asiento en la victoria sobre la adversidad.', verse: 'Romanos 8:37' },
+                { id: 'B2', message: 'Tu asiento en la sabiduría de Dios.', verse: 'Santiago 1:5' },
+                { id: 'B3', message: 'Tu asiento en el consuelo divino.', verse: '2 Corintios 1:3-4' },
+                { id: 'B4', message: 'Tu asiento en la paciencia que perfecciona.', verse: 'Santiago 1:4' },
+                { id: 'C1', message: 'Tu asiento en el amor que nunca falla.', verse: '1 Corintios 13:8' },
+                { id: 'C2', message: 'Tu asiento en la gracia que te sostiene.', verse: '2 Corintios 12:9' },
+                { id: 'C3', message: 'Tu asiento en la justicia de Cristo.', verse: 'Romanos 5:1' },
+                { id: 'C4', message: 'Tu asiento en la esperanza que no defrauda.', verse: 'Romanos 5:5' },
+                { id: 'D1', message: 'Tu asiento en la protección divina.', verse: 'Salmo 91:4' },
+                { id: 'D2', message: 'Tu asiento en la fidelidad de Dios.', verse: 'Lamentaciones 3:22-23' },
+                { id: 'D3', message: 'Tu asiento en la alegría del Señor.', verse: 'Nehemías 8:10' },
+                { id: 'D4', message: 'Tu asiento en la promesa de vida eterna.', verse: 'Juan 3:16' },
+            ];
+
+            const renderSeatSelection = () => {
+                const seatSelectionDiv = document.getElementById('seat-selection-area');
+                if (!seatSelectionDiv) return;
+                
+                let cabinHtml = '<div class="bg-gray-200 p-4 rounded-lg w-full max-w-sm mx-auto">';
+                cabinHtml += '<div class="bg-white rounded-t-full rounded-b-lg p-4 shadow-inner">';
+                
+                const rows = ['A', 'B', 'C', 'D'];
+                rows.forEach(rowLetter => {
+                    cabinHtml += `<div class="flex justify-center items-center my-2">`;
+                    // Left seats
+                    for(let i = 1; i <= 2; i++) {
+                        const seatId = `${rowLetter}${i}`;
+                        const seat = seatsData.find(s => s.id === seatId);
+                        const isOccupiedByOthers = seatsAvailability[seat.id] && seatsAvailability[seat.id] !== currentUserId;
+                        const isTemporarilySelected = selectedSeat && selectedSeat.id === seat.id;
+                        let seatClass = 'w-10 h-10 rounded-md border-2 border-blue-400 bg-blue-200 hover:bg-blue-300';
+                        if (isOccupiedByOthers) seatClass = 'w-10 h-10 rounded-md border-2 border-gray-500 bg-gray-400 cursor-not-allowed';
+                        if (isTemporarilySelected) seatClass = 'w-10 h-10 rounded-md border-2 border-green-700 bg-green-500 text-white';
+                        const disabledAttr = isOccupiedByOthers ? 'disabled' : '';
+                        cabinHtml += `<button id="seat-${seat.id}" class="${seatClass} mx-1 flex items-center justify-center font-bold text-xs" ${disabledAttr}>${seat.id}</button>`;
+                    }
+                    // Aisle
+                    cabinHtml += `<div class="w-8"></div>`;
+                    // Right seats
+                    for(let i = 3; i <= 4; i++) {
+                         const seatId = `${rowLetter}${i}`;
+                        const seat = seatsData.find(s => s.id === seatId);
+                        const isOccupiedByOthers = seatsAvailability[seat.id] && seatsAvailability[seat.id] !== currentUserId;
+                        const isTemporarilySelected = selectedSeat && selectedSeat.id === seat.id;
+                        let seatClass = 'w-10 h-10 rounded-md border-2 border-blue-400 bg-blue-200 hover:bg-blue-300';
+                        if (isOccupiedByOthers) seatClass = 'w-10 h-10 rounded-md border-2 border-gray-500 bg-gray-400 cursor-not-allowed';
+                        if (isTemporarilySelected) seatClass = 'w-10 h-10 rounded-md border-2 border-green-700 bg-green-500 text-white';
+                        const disabledAttr = isOccupiedByOthers ? 'disabled' : '';
+                        cabinHtml += `<button id="seat-${seat.id}" class="${seatClass} mx-1 flex items-center justify-center font-bold text-xs" ${disabledAttr}>${seat.id}</button>`;
+                    }
+                    cabinHtml += `</div>`;
+                });
+
+                cabinHtml += '</div></div>';
+                seatSelectionDiv.innerHTML = cabinHtml;
+
+                seatsData.forEach(seat => {
+                    const seatButton = document.getElementById(`seat-${seat.id}`);
+                    if (seatButton && !seatButton.disabled) {
+                        seatButton.addEventListener('click', () => {
+                            selectedSeat = seat;
+                            renderSeatSelection();
+                            updateGenerateButtonState();
+                            renderSelectedSeatInfo();
+                        });
+                    }
+                });
+                renderSelectedSeatInfo();
+            };
+
+            const renderSelectedSeatInfo = () => {
+                const selectedSeatInfoDiv = document.getElementById('selected-seat-info');
+                if (selectedSeatInfoDiv) {
+                    if (selectedSeat) {
+                        selectedSeatInfoDiv.innerHTML = `
+                            <div class="p-4 bg-blue-50 rounded-lg shadow-sm border border-blue-200 text-left animate-fade-in">
+                                <p class="text-lg text-gray-800 mb-2">
+                                    Asiento Seleccionado: <span class="font-bold text-indigo-600">${selectedSeat.id}</span>
+                                </p>
+                                <p class="text-gray-700 italic">
+                                    ¡<span class="font-bold text-purple-700">${participantName}</span>, ${selectedSeat.message.toLowerCase()}
+                                </p>
+                                <p class="text-sm text-gray-600 font-medium mt-1">
+                                    (${selectedSeat.verse})
+                                </p>
+                            </div>
+                        `;
+                    } else {
+                        selectedSeatInfoDiv.innerHTML = '';
+                    }
+                }
+            };
+
+            const updateGenerateButtonState = () => {
+                const generateButton = document.getElementById('generate-boarding-pass-button');
+                if (generateButton) {
+                    if (participantName.trim() && selectedSeat) {
+                        generateButton.classList.remove('bg-gray-400', 'text-gray-700', 'cursor-not-allowed');
+                        generateButton.classList.add('bg-green-500', 'hover:bg-green-600', 'text-white');
+                        generateButton.disabled = false;
+                    } else {
+                        generateButton.classList.remove('bg-green-500', 'hover:bg-green-600', 'text-white');
+                        generateButton.classList.add('bg-gray-400', 'text-gray-700', 'cursor-not-allowed');
+                        generateButton.disabled = true;
+                    }
+                }
+            };
+
+            const renderNameInput = () => {
+                appContainer.innerHTML = `
+                    <div class="flex flex-col items-center">
+                        <h2 class="text-3xl font-bold text-indigo-600 mb-5">Prepara tu Tarjeta de Embarque</h2>
+                        <p class="text-gray-600 text-lg mb-6">Para comenzar, por favor ingresa tu nombre:</p>
+                        <form id="name-form" class="w-full max-w-sm">
+                            <input type="text" id="participant-name-input" placeholder="Tu nombre aquí" class="w-full p-3 mb-6 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-transparent text-lg" value="${participantName}" required />
+                            <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50">
+                                Confirmar Nombre
+                            </button>
+                        </form>
+                    </div>
+                `;
+                document.getElementById('name-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const nameInput = document.getElementById('participant-name-input');
+                    if (nameInput.value.trim()) {
+                        participantName = nameInput.value.trim();
+                        nameSubmittedHtml = true;
+                        renderSeatSelectionArea();
+                    } else {
+                        alert('Por favor, ingresa tu nombre para continuar.');
+                    }
+                });
+            };
+
+            const renderSeatSelectionArea = () => {
+                appContainer.innerHTML = `
+                    <div class="flex flex-col items-center">
+                        <h2 class="text-3xl font-bold text-indigo-600 mb-5">Prepara tu Tarjeta de Embarque</h2>
+                        <p class="text-gray-600 text-lg mb-6">¡Hola, <span class="font-bold text-indigo-600">${participantName}</span>! Ahora, selecciona tu asiento para este viaje especial.</p>
+                        <p class="text-sm text-gray-500 mb-4">Tu ID de Participante: <span class="font-bold text-indigo-500 break-all">${currentUserId || 'Cargando...'}</span></p>
+
+                        <div id="seat-selection-area" class="mb-6 w-full">
+                            </div>
+                        <div id="selected-seat-info" class="mt-4 min-h-[100px] w-full max-w-sm"></div>
+                        <button id="generate-boarding-pass-button" class="mt-4 w-full max-w-sm font-bold py-3 px-6 rounded-full shadow-lg transform transition duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-opacity-50 bg-gray-400 text-gray-700 cursor-not-allowed" disabled>
+                            Generar Tarjeta de Embarque
+                        </button>
+                    </div>
+                `;
+                renderSeatSelection();
+                updateGenerateButtonState();
+
+                document.getElementById('generate-boarding-pass-button').addEventListener('click', async () => {
+                    if (!participantName.trim() || !selectedSeat) {
+                        alert('Por favor, ingresa tu nombre y selecciona un asiento.');
+                        return;
+                    }
+
+                    if (!db || !currentUserId) {
+                        console.warn("Firestore or User ID is not ready.");
+                        alert("Hubo un problema de conexión. Por favor, intenta de nuevo.");
+                        return;
+                    }
+                    
+                    const seatsDocRef = doc(db, `viajes/${appId}/seats`, 'availability');
+                    try {
+                        const docSnap = await getDoc(seatsDocRef);
+                        if (!docSnap.exists()) {
+                            throw new Error("Seat availability document does not exist.");
+                        }
+
+                        const currentAvailabilityData = docSnap.data();
+                        
+                        // Check if the selected seat is still available
+                        if (currentAvailabilityData[selectedSeat.id] !== null && currentAvailabilityData[selectedSeat.id] !== undefined) {
+                             alert('Lo sentimos, este asiento acaba de ser ocupado. Por favor, elige otro.');
+                             selectedSeat = null;
+                             renderCurrentStage(); // Re-render to show updated availability
+                             return;
+                        }
+
+                        // Prepare the update object
+                        const updates = {};
+                        // Release any seat previously held by this user
+                        for (const seatId in currentAvailabilityData) {
+                            if (currentAvailabilityData[seatId] === currentUserId) {
+                                updates[seatId] = null;
+                            }
+                        }
+                        // Claim the new seat
+                        updates[selectedSeat.id] = currentUserId;
+
+                        await updateDoc(seatsDocRef, updates);
+
+                        // Proceed to the next stage
+                        currentStage = 'boardingPassGenerated';
+                        renderCurrentStage();
+
+                    } catch (error) {
+                        showFirebaseError(error);
+                    }
+                });
+            };
+
+            // Main logic for renderStageBoardingPass
+            if (!showCheckinFormHtml) {
+                appContainer.innerHTML = `
+                    <div class="flex flex-col items-center">
+                        <h2 class="text-3xl font-bold text-indigo-600 mb-5">Prepara tu Tarjeta de Embarque</h2>
+                        <button id="checkin-button" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50 mb-6">
+                            Hacer Check-in
+                        </button>
+                    </div>
+                `;
+                document.getElementById('checkin-button').addEventListener('click', () => {
+                    showCheckinFormHtml = true;
+                    renderNameInput();
+                });
+            } else if (!nameSubmittedHtml) {
+                renderNameInput();
+            } else {
+                renderSeatSelectionArea();
+            }
+        };
+
+        const renderStageBoardingPassGenerated = () => {
+            const currentDate = new Date();
+            const formattedDate = currentDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }).replace('.', '').toUpperCase();
+            const destinationName = chosenFaithDestination ? chosenFaithDestination.name.toUpperCase() : 'AMOR DE DIOS';
+            const destinationCode = chosenFaithDestination ? chosenFaithDestination.name.substring(0, 3).toUpperCase() : 'AMD';
+            const gateConceptForDestination = chosenFaithDestination ? chosenFaithDestination.gateConcept : 'Fe';
+
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center animate-fade-in">
+                    <h2 class="text-3xl font-bold text-indigo-600 mb-6">¡Tu Tarjeta de Embarque está lista!</h2>
+                    
+                    <div class="w-full max-w-lg font-sans text-gray-800">
+                        <div class="bg-white shadow-xl rounded-lg flex">
+                            <!-- Main Pass Section -->
+                            <div class="w-2/3 p-4">
+                                <div class="flex justify-between items-center mb-3">
+                                     <div class="flex items-center">
+                                        <svg class="w-5 h-5 text-indigo-600 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l.623-.035.526-.072.786-.114L12 16.708V12.5A2.5 2.5 0 0114.5 10h1.5a.5.5 0 000-1h-1.5a2.5 2.5 0 01-2.5-2.5V4.39L13.19 2.947a1 1 0 00-1.284-1.284l-1.06 1.06z"/></svg>
+                                        <h3 class="text-lg font-bold text-indigo-600">SpiritLift Airlines</h3>
+                                     </div>
+                                     <span class="text-xs font-semibold">PASE DE ABORDAR</span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <p class="text-xs text-gray-500">NOMBRE DEL PASAJERO</p>
+                                    <p class="text-md font-bold">${participantName.toUpperCase()}</p>
+                                </div>
+
+                                <div class="flex mb-3">
+                                    <div class="w-1/2">
+                                        <p class="text-xs text-gray-500">DESDE</p>
+                                        <p class="text-md font-bold">PRUEBA Y DUDA (PYD)</p>
+                                    </div>
+                                    <div class="w-1/2">
+                                        <p class="text-xs text-gray-500">HACIA</p>
+                                        <p class="text-md font-bold">${destinationName} (${destinationCode})</p>
+                                    </div>
+                                </div>
+
+                                <div class="flex mb-4">
+                                    <div class="w-1/3">
+                                        <p class="text-xs text-gray-500">VUELO</p>
+                                        <p class="text-md font-mono font-bold">SL-173</p>
+                                    </div>
+                                    <div class="w-1/3">
+                                        <p class="text-xs text-gray-500">FECHA</p>
+                                        <p class="text-md font-mono font-bold">${formattedDate}</p>
+                                    </div>
+                                    <div class="w-1/3">
+                                        <p class="text-xs text-gray-500">GRUPO</p>
+                                        <p class="text-md font-mono font-bold">1</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex justify-center items-center h-8 bg-gray-800">
+                                    <div class="w-1 h-full bg-white"></div><div class="w-1 h-full bg-gray-800"></div><div class="w-2 h-full bg-white"></div><div class="w-1 h-full bg-gray-800"></div><div class="w-1 h-full bg-white"></div><div class="w-2 h-full bg-gray-800"></div><div class="w-1 h-full bg-white"></div><div class="w-1 h-full bg-gray-800"></div><div class="w-1 h-full bg-white"></div><div class="w-1 h-full bg-gray-800"></div><div class="w-2 h-full bg-white"></div><div class="w-1 h-full bg-gray-800"></div><div class="w-1 h-full bg-white"></div><div class="w-1 h-full bg-gray-800"></div><div class="w-2 h-full bg-white"></div><div class="w-1 h-full bg-gray-800"></div><div class="w-1 h-full bg-white"></div><div class="w-2 h-full bg-gray-800"></div><div class="w-1 h-full bg-white"></div><div class="w-1 h-full bg-gray-800"></div><div class="w-2 h-full bg-white"></div><div class="w-2 h-full bg-gray-800"></div><div class="w-1 h-full bg-white"></div><div class="w-1 h-full bg-gray-800"></div><div class="w-1 h-full bg-white"></div><div class="w-1 h-full bg-gray-800"></div><div class="w-2 h-full bg-white"></div><div class="w-1 h-full bg-gray-800"></div><div class="w-1 h-full bg-white"></div><div class="w-2 h-full bg-gray-800"></div><div class="w-2 h-full bg-white"></div><div class="w-1 h-full bg-gray-800"></div><div class="w-1 h-full bg-white"></div><div class="w-1 h-full bg-gray-800"></div>
+                                </div>
+                            </div>
+                            <!-- Stub Section -->
+                            <div class="w-1/3 bg-gray-50 p-4 dotted-border-l flex flex-col justify-between items-center">
+                                <div>
+                                    <h3 class="text-sm font-bold text-indigo-600 mb-3">SpiritLift</h3>
+                                    <div class="mb-2 text-center">
+                                        <p class="text-xs text-gray-500">PUERTA</p>
+                                        <p class="text-xl font-bold">${gateConceptForDestination.substring(0,3).toUpperCase()}</p>
+                                    </div>
+                                    <div class="mb-3 text-center">
+                                        <p class="text-xs text-gray-500">ASIENTO</p>
+                                        <p class="text-xl font-bold">${selectedSeat ? selectedSeat.id : 'N/A'}</p>
+                                    </div>
+                                    <div class="text-center">
+                                        <p class="text-xs text-gray-500">HORA ABORDAJE</p>
+                                        <p class="text-md font-bold">AHORA</p>
+                                    </div>
+                                </div>
+                                <img src="https://i.imgur.com/cwG45GU.png" alt="QR Code" class="w-16 h-16 rounded-md mt-3" onerror="this.onerror=null;this.src='https://placehold.co/64x64/cccccc/000000?text=QR';">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button id="next-button" class="mt-8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50">
+                        Continuar el Viaje
+                    </button>
+                </div>
+            `;
+            document.getElementById('next-button').addEventListener('click', () => {
+                currentStage = 'luggageIntro';
+                renderCurrentStage();
+            });
+        };
+
+        const renderLuggageIntroAnimation = () => {
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full transition-opacity duration-500 opacity-0">
+                    <svg class="w-24 h-24 text-indigo-500 mb-6 animate-bounce" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-1 1v1h2V3a1 1 0 00-1-1zM7 5H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2V4a1 1 0 00-2 0v1H9V4a1 1 0 00-1-1zm3 5a1 1 0 00-1 1v3a1 1 0 102 0v-3a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                    </svg>
+                    <h2 class="text-4xl font-extrabold text-indigo-700 mb-4 drop-shadow-md animate-pulse">
+                        ¡Ahora revisemos tu equipaje!
+                    </h2>
+                    <p class="text-xl text-gray-700 italic">
+                        ¿Qué estás llevando para este viaje de fe?
+                    </p>
+                </div>
+            `;
+            const animationDiv = appContainer.querySelector('div');
+            setTimeout(() => {
+                animationDiv.classList.remove('opacity-0');
+                animationDiv.classList.add('opacity-100');
+            }, 100);
+
+            setTimeout(() => {
+                animationDiv.classList.remove('opacity-100');
+                animationDiv.classList.add('opacity-0');
+                setTimeout(() => {
+                    currentStage = 'luggage';
+                    renderCurrentStage();
+                }, 500);
+            }, 3000);
+        };
+
+        const renderStageLuggage = () => {
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center">
+                    <h2 class="text-3xl font-bold text-indigo-600 mb-5">Etapa 2: El Equipaje</h2>
+                    <p class="text-gray-700 text-lg leading-relaxed mb-6 text-justify">
+                        En este viaje de fe, nuestro equipaje no es material, sino espiritual. Los elementos más esenciales son la fe, la esperanza y el amor.
+                    </p>
+                    <p class="text-gray-800 text-xl font-semibold mb-6 italic">
+                        "Y ahora permanecen la fe, la esperanza y el amor, estos tres; pero el mayor de ellos es el amor."
+                        <br /><span class="text-sm font-normal text-gray-600">(1 Corintios 13:13)</span>
+                    </p>
+                    <p class="text-gray-800 text-xl font-semibold mb-8 italic">
+                        "Por lo tanto, ya que estamos rodeados por una enorme multitud de testigos de la vida de fe, quitémonos todo peso que nos impida correr, especialmente el pecado que tan fácilmente nos hace tropezar. Y corramos con perseverancia la carrera que Dios nos ha puesto por delante."
+                        <br /><span class="text-sm font-normal text-gray-600">(Hebreos 12:1)</span>
+                    </p>
+                    <button id="next-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50">
+                        Siguiente: Entregar Equipaje
+                    </button>
+                </div>
+            `;
+            document.getElementById('next-button').addEventListener('click', () => {
+                currentStage = 'luggageDropOffIntro';
+                renderCurrentStage();
+            });
+        };
+
+        const renderLuggageDropOffAnimation = () => {
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full transition-opacity duration-500 opacity-0">
+                    <div id="luggage-animation-content" class="flex flex-col items-center">
+                        <svg class="w-24 h-24 text-blue-500 mb-6 animate-bounce" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l3 3a1 1 0 001.414-1.414L11.414 11H10V6z" clip-rule="evenodd"></path>
+                        </svg>
+                        <h2 class="text-4xl font-extrabold text-blue-700 mb-4 drop-shadow-md animate-pulse">
+                            ¡Entregando tu equipaje!
+                        </h2>
+                        <p class="text-xl text-gray-700 italic">
+                            Pesando lo que llevas para este viaje...
+                        </p>
+                    </div>
+                </div>
+            `;
+            const animationDiv = appContainer.querySelector('div');
+            setTimeout(() => {
+                animationDiv.classList.remove('opacity-0');
+                animationDiv.classList.add('opacity-100');
+            }, 100);
+
+            setTimeout(() => {
+                let luggageWeight = parseFloat((Math.random() * (23 - 18) + 18).toFixed(1));
+                
+                if (luggageWeight > 20.0) {
+                    renderOverweightStage(luggageWeight);
+                } else {
+                    animationDiv.innerHTML = `
+                        <div class="bg-white p-8 rounded-xl shadow-2xl border-4 border-blue-400 w-full max-w-sm transform scale-95 animate-scale-in">
+                            <h3 class="text-3xl font-bold text-blue-600 mb-4">Boucher de Equipaje</h3>
+                            <div class="flex justify-between items-center mb-4">
+                                <p class="text-xl text-gray-700">Peso Total:</p>
+                                <p class="text-4xl font-extrabold text-green-600">${luggageWeight.toFixed(1)} kg</p>
+                            </div>
+                             <p class="text-green-600 font-bold text-lg mt-2 mb-2">¡Equipaje Aprobado!</p>
+                            <p class="text-gray-600 text-sm italic">
+                                Recuerda que el peso de tu fe es incalculable.
+                            </p>
+                            <p class="text-gray-500 text-xs mt-2">
+                                Vuelo de la Fe - SpiritLift Airlines
+                            </p>
+                        </div>
+                    `;
+                     setTimeout(() => {
+                        currentStage = 'airport';
+                        renderCurrentStage();
+                    }, 4000);
+                }
+            }, 2000);
+        };
+
+        const renderOverweightStage = (initialWeight) => {
+            let currentWeight = initialWeight;
+            let burdens = [
+                { id: 'rencor', name: 'Rencor', weight: 1.2, dropped: false },
+                { id: 'culpa', name: 'Culpa', weight: 1.5, dropped: false },
+                { id: 'orgullo', name: 'Orgullo', weight: 1.3, dropped: false },
+                { id: 'temores', name: 'Temores', weight: 1.8, dropped: false },
+                { id: 'control', name: 'Control', weight: 1.6, dropped: false },
+                { id: 'tristeza', name: 'Tristeza', weight: 1.4, dropped: false },
+            ];
+
+            const updateUI = () => {
+                const weightDisplay = document.getElementById('weight-display');
+                const continueButton = document.getElementById('continue-overweight-button');
+                const burdensContainer = document.getElementById('burdens-container');
+
+                weightDisplay.textContent = `${currentWeight.toFixed(1)} kg`;
+                weightDisplay.className = `text-4xl font-extrabold ${currentWeight > 20.0 ? 'text-red-600 animate-pulse' : 'text-green-600'}`;
+
+                burdensContainer.innerHTML = burdens.map(burden => `
+                    <button id="burden-${burden.id}" class="p-2 rounded-lg shadow-md transition-all duration-200 ${burden.dropped ? 'bg-gray-400 text-gray-600 cursor-not-allowed' : 'bg-red-200 hover:bg-red-300'}" ${burden.dropped ? 'disabled' : ''}>
+                        Soltar ${burden.name}
+                    </button>
+                `).join('');
+
+                burdens.forEach(burden => {
+                    if (!burden.dropped) {
+                        document.getElementById(`burden-${burden.id}`).addEventListener('click', () => {
+                            currentWeight -= burden.weight;
+                            burden.dropped = true;
+                            updateUI();
+                        });
+                    }
+                });
+
+                if (currentWeight <= 20.0) {
+                    continueButton.disabled = false;
+                    continueButton.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                    continueButton.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+                } else {
+                    continueButton.disabled = true;
+                    continueButton.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                    continueButton.classList.add('bg-gray-400', 'cursor-not-allowed');
+                }
+            };
+
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center animate-fade-in">
+                    <h2 class="text-3xl font-bold text-red-600 mb-4">¡Exceso de Equipaje!</h2>
+                    <p class="text-gray-700 text-lg mb-4">Tu equipaje pesa <span id="weight-display" class="text-4xl font-extrabold text-red-600 animate-pulse">${initialWeight.toFixed(1)} kg</span> y el límite es 20.0 kg.</p>
+                    <p class="text-gray-600 mb-6">Para poder continuar, necesitas alivianar tu carga. ¿Estás dispuesto a soltar algo de esto?</p>
+                    
+                    <div id="burdens-container" class="grid grid-cols-2 sm:grid-cols-3 gap-4 w-full max-w-md mb-8">
+                    </div>
+
+                    <button id="continue-overweight-button" class="bg-gray-400 text-white font-bold py-3 px-8 rounded-full shadow-lg cursor-not-allowed" disabled>
+                        Continuar Viaje
+                    </button>
+                </div>
+            `;
+            updateUI();
+
+            document.getElementById('continue-overweight-button').addEventListener('click', () => {
+                currentStage = 'lightenedLoadMessage';
+                renderCurrentStage();
+            });
+        };
+
+        const renderLightenedLoadMessage = () => {
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center animate-fade-in">
+                    <h2 class="text-3xl font-bold text-green-600 mb-5">¡Te sientes más ligero!</h2>
+                    <p class="text-gray-800 text-xl font-semibold mb-8 italic text-justify">
+                        “Pero ahora es el momento de eliminar el enojo, la furia, el comportamiento malicioso, la calumnia y el lenguaje sucio. No se mientan unos a otros, porque ustedes ya se han quitado la vieja naturaleza pecaminosa y todos sus actos perversos. Vístanse con la nueva naturaleza, y se renovarán a medida que aprendan a conocer a su Creador y se parezcan más a él.”
+                        <br /><span class="text-sm font-normal text-gray-600">(Colosenses 3:8-10)</span>
+                    </p>
+                     <button id="next-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50">
+                        Continuar al Aeropuerto
+                    </button>
+                </div>
+            `;
+             document.getElementById('next-button').addEventListener('click', () => {
+                currentStage = 'airport';
+                renderCurrentStage();
+            });
+        }
+
+        const renderStageAirport = () => {
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center">
+                    <h2 class="text-3xl font-bold text-indigo-600 mb-5">Etapa 3: La Sala de Espera</h2>
+                    <p class="text-gray-700 text-lg leading-relaxed mb-6 text-justify">
+                        <b class="text-blue-600">“Espera con paciencia al Señor; sé valiente y esforzado. Sí, espera al Señor con paciencia.”</b>
+                        <br /><span class="text-sm font-normal text-gray-600">(Salmo 27:14)</span>
+                    </p>
+                    <p class="text-blue-600 font-bold italic text-lg leading-relaxed mb-6 text-center">
+                        En la sala de espera, Dios no se retrasa… Él te prepara.
+                    </p>
+                    <p class="text-gray-800 text-xl font-semibold mb-8 italic">
+                        “En cambio, los que confían en el Señor encontrarán nuevas fuerzas; volarán alto como con alas de águila. Correrán y no se cansarán; caminarán y no desmayarán.”
+                        <br /><span class="text-sm font-normal text-gray-600">(Isaías 40:31)</span>
+                    </p>
+                    <button id="next-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50">
+                        Siguiente: El Abordar
+                    </button>
+                </div>
+            `;
+            document.getElementById('next-button').addEventListener('click', () => {
+                currentStage = 'welcomeAboardIntro';
+                renderCurrentStage();
+            });
+        };
+
+        const renderWelcomeAboardAnimation = () => {
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full transition-opacity duration-500 opacity-0">
+                    <svg class="w-24 h-24 text-blue-600 mb-6 animate-pulse" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"></path>
+                    </svg>
+                    <h2 class="text-4xl font-extrabold text-blue-800 mb-4 drop-shadow-md animate-fade-in">
+                        ¡Bienvenido a Bordo!
+                    </h2>
+                    <p class="text-xl text-gray-700 italic">
+                        Prepárate para el despegue de tu viaje de fe.
+                    </p>
+                </div>
+            `;
+            const animationDiv = appContainer.querySelector('div');
+            setTimeout(() => {
+                animationDiv.classList.remove('opacity-0');
+                animationDiv.classList.add('opacity-100');
+            }, 100);
+
+            setTimeout(() => {
+                animationDiv.classList.remove('opacity-100');
+                animationDiv.classList.add('opacity-0');
+                setTimeout(() => {
+                    currentStage = 'boarding';
+                    renderCurrentStage();
+                }, 500);
+            }, 3000);
+        };
+
+
+        const renderStageBoarding = () => {
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center">
+                    <h2 class="text-3xl font-bold text-indigo-600 mb-5">Etapa 4: El Abordar</h2>
+                    <p class="text-gray-700 text-lg leading-relaxed mb-6 text-justify">
+                        Abordar el avión de la fe significa confiar plenamente en Dios y dar el paso, dejando atrás las dudas y los temores.
+                    </p>
+                    <p class="text-gray-800 text-xl font-semibold mb-4 italic">
+                        "Fíate de Jehová de todo tu corazón, y no te apoyes en tu propia prudencia. Reconócelo en todos tus caminos, y él enderezará tus veredas."
+                        <br /><span class="text-sm font-normal text-gray-600">(Proverbios 3:5-6)</span>
+                    </p>
+                    <p class="text-gray-700 text-lg leading-relaxed mb-6 text-justify">
+                        Como Pedro, a veces se nos pide salir de nuestra "barca" y caminar sobre las aguas de la fe.
+                    </p>
+                    <p class="text-gray-800 text-xl font-semibold mb-8 italic">
+                        "Entonces le respondió Pedro: Señor, si eres tú, manda que yo vaya a ti sobre las aguas. Y él dijo: Ven. Y descendiendo Pedro de la barca, andaba sobre las aguas para ir a Jesús."
+                        <br /><span class="text-sm font-normal text-gray-600">(Mateo 14:28-29)</span>
+                    </p>
+                    <button id="next-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50">
+                        Siguiente: El Viaje
+                    </button>
+                </div>
+            `;
+            document.getElementById('next-button').addEventListener('click', () => {
+                currentStage = 'fastenSeatbeltIntro';
+                renderCurrentStage();
+            });
+        };
+
+        const renderFastenSeatbeltAnimation = () => {
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full transition-opacity duration-500 opacity-0">
+                    <div id="seatbelt-icon-container" class="w-48 h-24 relative text-yellow-500 mb-6 flex items-center justify-center">
+                        <svg id="buckle-tongue" class="w-1/2 h-full absolute left-0" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M 80 40 L 20 40 L 20 60 L 80 60 L 80 40 Z" fill="currentColor" />
+                            <path d="M 20 40 L 20 60 L 0 50 Z" fill="currentColor" />
+                        </svg>
+                        <svg id="buckle-receiver" class="w-1/2 h-full absolute right-0" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M 20 40 L 80 40 L 80 60 L 20 60 L 20 40 Z" fill="currentColor" />
+                            <rect x="30" y="45" width="20" height="10" fill="black" />
+                        </svg>
+                    </div>
+                    <h2 class="text-4xl font-extrabold text-yellow-700 mb-4 drop-shadow-md animate-pulse">
+                        ¡Asegura tu cinturón!
+                    </h2>
+                    <p class="text-xl text-gray-700 italic">
+                        Estamos a punto de despegar en este viaje de fe.
+                    </p>
+                </div>
+            `;
+            const animationDiv = appContainer.querySelector('div');
+            const buckleTongue = document.getElementById('buckle-tongue');
+            const buckleReceiver = document.getElementById('buckle-receiver');
+
+            // Initial positioning for open state
+            buckleTongue.style.transform = 'translateX(-30px)';
+            buckleReceiver.style.transform = 'translateX(30px)';
+
+            setTimeout(() => {
+                animationDiv.classList.remove('opacity-0');
+                animationDiv.classList.add('opacity-100');
+            }, 100);
+
+            // Animate seatbelt closing
+            setTimeout(() => {
+                if (buckleTongue && buckleReceiver) {
+                    buckleTongue.style.animation = 'buckle-tongue-close 0.5s ease-out forwards';
+                    buckleReceiver.style.animation = 'buckle-receiver-close 0.5s ease-out forwards';
+                    setTimeout(() => {
+                        buckleTongue.classList.add('buckled-flash');
+                        buckleReceiver.classList.add('buckled-flash');
+                    }, 500);
+                }
+            }, 1000);
+
+            setTimeout(() => {
+                animationDiv.classList.remove('opacity-100');
+                animationDiv.classList.add('opacity-0');
+                setTimeout(() => {
+                    currentStage = 'story';
+                    renderCurrentStage();
+                }, 500);
+            }, 4000);
+        };
+
+        const renderStageTravel = () => {
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center">
+                    <h2 class="text-3xl font-bold text-indigo-600 mb-5">Etapa 5: El Viaje</h2>
+                    <p class="text-gray-700 text-lg leading-relaxed mb-6 text-justify">
+                        El viaje es la vida misma, con sus desafíos y bendiciones. En cada momento, experimentamos la presencia y el amor de Dios.
+                    </p>
+                    <p class="text-gray-800 text-xl font-semibold mb-4 italic">
+                        "Aunque ande en valle de sombra de muerte, no temeré mal alguno, porque tú estarás conmigo; tu vara y tu cayado me infundirán aliento."
+                        <br /><span class="text-sm font-normal text-gray-600">(Salmo 23:4)</span>
+                    </p>
+                    <p class="text-gray-700 text-lg leading-relaxed mb-6 text-justify">
+                        Dios obra en todas las cosas para nuestro bien, incluso en las dificultades.
+                    </p>
+                    <p class="text-gray-800 text-xl font-semibold mb-8 italic">
+                        "Y sabemos que a los que aman a Dios, todas las cosas les ayudan a bien, esto es, a los que conforme a su propósito son llamados."
+                        <br /><span class="text-sm font-normal text-gray-600">(Romanos 8:28)</span>
+                    </p>
+                    <button id="next-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50">
+                        Siguiente: El Destino
+                    </button>
+                </div>
+            `;
+            document.getElementById('next-button').addEventListener('click', () => {
+                currentStage = 'turbulenceIntro';
+                renderCurrentStage();
+            });
+        };
+
+        const renderTurbulenceAnimation = () => {
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full transition-opacity duration-500 opacity-0 animate-shake">
+                    <svg class="w-24 h-24 text-red-500 mb-6 animate-pulse" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.364 2.049-1.364 2.814 0l7.052 12.636c.765 1.364-.135 2.636-1.479 2.636H2.68c-1.345 0-2.249-1.272-1.479-2.636l7.052-12.636zM11 15a1 1 0 10-2 0v2a1 1 0 102 0v-2zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V7a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                    </svg>
+                    <h2 class="text-4xl font-extrabold text-red-700 mb-4 drop-shadow-md animate-pulse">
+                        ¡Atención, pasajeros!
+                    </h2>
+                    <p class="text-xl text-gray-700 italic text-center">
+                        El Capitán informa sobre turbulencias. Mantengan la calma y confíen en el Piloto.
+                    </p>
+                    <p class="text-sm text-gray-600 mt-2">
+                        "No temas, porque yo estoy contigo; no desmayes, porque yo soy tu Dios que te esfuerzo; siempre te ayudaré, siempre te sustentaré con la diestra de mi justicia." (Isaías 41:10)
+                    </p>
+                </div>
+            `;
+            const animationDiv = appContainer.querySelector('div');
+            setTimeout(() => {
+                animationDiv.classList.remove('opacity-0');
+                animationDiv.classList.add('opacity-100');
+            }, 100);
+
+            setTimeout(() => {
+                animationDiv.classList.remove('opacity-100');
+                animationDiv.classList.add('opacity-0');
+                setTimeout(() => {
+                    currentStage = 'destination';
+                    renderCurrentStage();
+                }, 500);
+            }, 6000);
+        };
+
+        const renderDestinationArrivalAnimation = () => {
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full transition-opacity duration-500 opacity-0">
+                    <svg class="w-32 h-32 text-green-500 mb-6 animate-pulse" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                    </svg>
+                    <h2 class="text-5xl font-extrabold text-green-700 mb-4 drop-shadow-md animate-fade-in">
+                        ¡Has llegado a tu Destino!
+                    </h2>
+                    <p class="text-xl text-gray-700 italic">
+                        El final de tu viaje de fe.
+                    </p>
+                </div>
+            `;
+            const animationDiv = appContainer.querySelector('div');
+            setTimeout(() => {
+                animationDiv.classList.remove('opacity-0');
+                animationDiv.classList.add('opacity-100');
+            }, 100);
+
+            setTimeout(() => {
+                animationDiv.classList.remove('opacity-100');
+                animationDiv.classList.add('opacity-0');
+                setTimeout(() => {
+                    currentStage = 'finalThanks';
+                    renderCurrentStage();
+                }, 500);
+            }, 3000);
+        };
+
+
+        const renderStageDestination = () => {
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center">
+                    <h2 class="text-3xl font-bold text-indigo-600 mb-5">Etapa 6: El Destino</h2>
+                    <p class="text-gray-700 text-lg leading-relaxed mb-6 text-justify">
+                        El destino final de nuestro viaje es el amor eterno de Dios, la vida eterna y la plenitud en Su presencia.
+                    </p>
+                    <p class="text-gray-800 text-xl font-semibold mb-4 italic">
+                        "Porque de tal manera amó Dios al mundo, que ha dado a su Hijo unigénito, para que todo aquel que en él cree, no se pierda, mas tenga vida eterna."
+                        <br /><span class="text-sm font-normal text-gray-600">(Juan 3:16)</span>
+                    </p>
+                    <p class="text-gray-700 text-lg leading-relaxed mb-6 text-justify">
+                        En este destino, toda lágrima será enjugada y no habrá más dolor.
+                    </p>
+                    <p class="text-gray-800 text-xl font-semibold mb-8 italic">
+                        "Y oí una gran voz del cielo que decía: He aquí el tabernáculo de Dios con los hombres, y él morará con ellos; y ellos serán su pueblo, y Dios mismo estará con ellos como su Dios. Enjugará Dios toda lágrima de los ojos de ellos; y ya no habrá muerte, ni habrá más llanto, ni clamor, ni dolor; porque las primeras cosas pasaron."
+                        <br /><span class="text-sm font-normal text-gray-600">(Apocalipsis 21:3-4)</span>
+                    </p>
+                    <button id="activate-arrival-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50">
+                        Activar Llegada al Destino
+                    </button>
+                </div>
+            `;
+            document.getElementById('activate-arrival-button').addEventListener('click', () => {
+                currentStage = 'destinationArrivalIntro';
+                renderCurrentStage();
+            });
+        };
+
+        const renderFinalThanks = () => {
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full animate-fade-in">
+                    <h2 class="text-3xl font-bold text-indigo-600 mb-5">¡Gracias por volar con SpiritLift Airlines!</h2>
+                    <p class="text-gray-700 text-lg leading-relaxed mb-6 text-justify">
+                        Ha sido un honor tenerte en este Viaje de Fe. Esperamos que hayas encontrado paz y fortaleza en cada etapa.
+                    </p>
+                    <p class="text-gray-800 text-xl font-semibold mb-8 italic">
+                        "El Señor te bendiga y te guarde; el Señor haga resplandecer su rostro sobre ti y tenga de ti misericordia; el Señor alce sobre ti su rostro y te dé paz."
+                        <br /><span class="text-sm font-normal text-gray-600">(Números 6:24-26)</span>
+                    </p>
+                    <button id="next-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50">
+                        Finalizar
+                    </button>
+                </div>
+            `;
+            document.getElementById('next-button').addEventListener('click', () => {
+                currentStage = 'finalScreen';
+                renderCurrentStage();
+            });
+        };
+
+        const renderFinalScreen = () => {
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full animate-fade-in">
+                    <img src="https://i.imgur.com/AzSMYHP.png" alt="Logo de la Marca" class="w-48 h-48 mb-8 rounded-full shadow-lg animate-pulse" onerror="this.onerror=null;this.src='https://placehold.co/192x192/cccccc/000000?text=Logo';">
+                    <h2 class="text-3xl font-bold text-indigo-600 mb-5">Un viaje de Fe</h2>
+                    <p class="text-gray-700 text-lg leading-relaxed mb-8 text-center max-w-md">
+                        Gracias por acompañarnos. Que tu viaje continúe con fe, esperanza y amor.
+                    </p>
+                    <button id="restart-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50">
+                        Realizar otro viaje
+                    </button>
+                </div>
+            `;
+            document.getElementById('restart-button').addEventListener('click', () => {
+                // Reset all state variables for a fresh start
+                participantName = '';
+                selectedSeat = null;
+                showCheckinFormHtml = false;
+                nameSubmittedHtml = false;
+                chosenFaithDestination = null;
+                currentStage = 'coverPage';
+                renderCurrentStage();
+            });
+        };
+
+
+        // --- Initial Setup ---
+        window.onload = () => {
+            setupFirebase();
+        };
+
+    </script>
+</body>
+</html>
